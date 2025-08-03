@@ -21,36 +21,37 @@ Tab:CreateToggle({
         autoFishing = Value
         if autoFishing then
             task.spawn(function()
-                -- Klik sekali untuk lempar pancing
+                -- Step 1: lempar pancing sekali aja
                 vu:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
                 wait(0.1)
                 vu:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                print("Lempar pancing")
+                print("Lempar pancing sekali")
 
                 while autoFishing do
-                    local fishingGui
+                    -- Step 2: tunggu progress bar muncul
+                    local fishingGui = nil
                     repeat
                         wait(0.1)
-                        fishingGui = player.PlayerGui:FindFirstChild("FishingGui") -- Ganti sesuai nama GUI
+                        fishingGui = player.PlayerGui:FindFirstChild("FishingGui") -- Ganti sesuai nama GUI game
                     until fishingGui or not autoFishing
 
                     if not autoFishing then break end
 
-                    local blackBar = fishingGui:FindFirstChild("BlackBar") -- bar abu
-                    local redBar = fishingGui:FindFirstChild("RedBar") -- bar merah
+                    -- Step 3: cari bar merah dan bar abu
+                    local blackBar = fishingGui:FindFirstChild("BlackBar") -- ganti sesuai nama bar abu
+                    local redBar = fishingGui:FindFirstChild("RedBar") -- ganti sesuai nama bar merah
 
                     if blackBar and redBar then
-                        print("Mulai tahan klik dan ikutin bar merah")
+                        print("Progress bar muncul, mulai tahan klik dan ikuti bar merah")
 
                         -- tahan klik
                         vu:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 
-                        -- loop update posisi bar abu supaya selalu sama posisi bar merah
+                        -- update posisi bar abu supaya ikuti bar merah
                         while autoFishing and fishingGui and blackBar and redBar do
-                            -- update posisi bar abu ikut posisi bar merah
                             blackBar.Position = redBar.Position
 
-                            -- update referensi, kalau bar ilang berhenti
+                            -- refresh bar referensi
                             blackBar = fishingGui:FindFirstChild("BlackBar")
                             redBar = fishingGui:FindFirstChild("RedBar")
                             if not blackBar or not redBar then break end
@@ -58,7 +59,7 @@ Tab:CreateToggle({
                             wait(0.03)
                         end
 
-                        -- lepas klik saat selesai
+                        -- lepas klik setelah selesai
                         vu:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
                         print("Lepas klik, selesai mancing")
 
@@ -68,12 +69,12 @@ Tab:CreateToggle({
                         print("Bar GUI tidak ditemukan, coba lagi")
                     end
 
-                    -- lempar pancing lagi untuk cycle berikutnya
+                    -- Step 4: lempar pancing lagi untuk next cycle
                     if autoFishing then
                         vu:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
                         wait(0.1)
                         vu:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                        print("Lempar pancing")
+                        print("Lempar pancing lagi")
                     end
 
                     wait(0.5)
