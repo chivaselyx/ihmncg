@@ -1,4 +1,3 @@
--- Script Auto Mancing Indo Hangout dengan Rayfield GUI
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local vu = game:GetService("VirtualUser")
 local player = game.Players.LocalPlayer
@@ -7,9 +6,7 @@ local Window = Rayfield:CreateWindow({
    Name = "Indo Hangout Auto Mancing",
    LoadingTitle = "Belajar Scripting",
    LoadingSubtitle = "Script by Kamu",
-   ConfigurationSaving = {
-      Enabled = false,
-   },
+   ConfigurationSaving = { Enabled = false },
    KeySystem = false,
 })
 
@@ -24,41 +21,62 @@ Tab:CreateToggle({
         autoFishing = Value
         if autoFishing then
             task.spawn(function()
-                while autoFishing do
-                    -- step 1: klik sekali buat lempar pancing
-                    vu:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                    wait(0.1)
-                    vu:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                    print("Lempar pancing")
+                -- Klik sekali untuk lempar pancing
+                vu:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                wait(0.1)
+                vu:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                print("Lempar pancing")
 
-                    -- step 2: tunggu progress bar muncul
-                    local foundBar = nil
-                    local tries = 0
+                while autoFishing do
+                    local fishingGui
                     repeat
                         wait(0.1)
-                        tries = tries + 1
-                        local gui = player.PlayerGui:FindFirstChild("FishingGui") -- Ganti dengan nama GUI di game
-                        if gui then
-                            foundBar = gui:FindFirstChild("ProgressBar") -- Ganti dengan nama bar di GUI
-                        end
-                        if tries > 50 then
-                            break
-                        end
-                    until foundBar or not autoFishing
+                        fishingGui = player.PlayerGui:FindFirstChild("FishingGui") -- Ganti sesuai nama GUI
+                    until fishingGui or not autoFishing
 
-                    if foundBar and autoFishing then
-                        print("Progress bar muncul, tahan klik...")
-                        -- step 3: tahan klik
+                    if not autoFishing then break end
+
+                    local blackBar = fishingGui:FindFirstChild("BlackBar") -- bar abu
+                    local redBar = fishingGui:FindFirstChild("RedBar") -- bar merah
+
+                    if blackBar and redBar then
+                        print("Mulai tahan klik dan ikutin bar merah")
+
+                        -- tahan klik
                         vu:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 
-                        wait(2) -- sesuaikan waktu lepas klik
+                        -- loop update posisi bar abu supaya selalu sama posisi bar merah
+                        while autoFishing and fishingGui and blackBar and redBar do
+                            -- update posisi bar abu ikut posisi bar merah
+                            blackBar.Position = redBar.Position
 
-                        -- step 4: lepas klik
+                            -- update referensi, kalau bar ilang berhenti
+                            blackBar = fishingGui:FindFirstChild("BlackBar")
+                            redBar = fishingGui:FindFirstChild("RedBar")
+                            if not blackBar or not redBar then break end
+
+                            wait(0.03)
+                        end
+
+                        -- lepas klik saat selesai
                         vu:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                        print("Lepas klik")
+                        print("Lepas klik, selesai mancing")
+
+                        -- tunggu animasi selesai
+                        wait(3)
+                    else
+                        print("Bar GUI tidak ditemukan, coba lagi")
                     end
 
-                    wait(3) -- tunggu animasi mancing selesai
+                    -- lempar pancing lagi untuk cycle berikutnya
+                    if autoFishing then
+                        vu:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                        wait(0.1)
+                        vu:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                        print("Lempar pancing")
+                    end
+
+                    wait(0.5)
                 end
             end)
         else
