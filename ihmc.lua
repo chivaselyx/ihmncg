@@ -1,8 +1,4 @@
-
-
-
 local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
-
 
 local Window = Rayfield:CreateWindow({
     Name = "Flying Script",
@@ -13,9 +9,7 @@ local Window = Rayfield:CreateWindow({
         FolderName = "FlyScriptConfig",
         FileName = "UserSettings"
     },
-    Discord = {
-        Enabled = false,
-    },
+    Discord = { Enabled = false },
     KeySystem = false
 })
 
@@ -24,9 +18,10 @@ local flying = false
 local speed = 50
 local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local rootPart = character:WaitForChild("HumanoidRootPart")
-
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
+local flyConnection
 
 local FlyToggle = Window:CreateToggle({
     Name = "Fly",
@@ -54,66 +49,61 @@ local SpeedSlider = Window:CreateSlider({
     end,
 })
 
-
-local bodyGyro
-local bodyVelocity
-
+-- Fly logic
 function startFlying()
-    -- Ensure humanoid state allows flying
-    humanoid.PlatformStand = true
-    
-    bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.P = 9e4
-    bodyGyro.MaxTorque = Vector3.new(9e5, 9e5, 9e5)
-    bodyGyro.CFrame = rootPart.CFrame
-    bodyGyro.Parent = rootPart
+    local alignPos = Instance.new("AlignPosition", humanoidRootPart)
+    local alignOri = Instance.new("AlignOrientation", humanoidRootPart)
+    local attachmentA = Instance.new("Attachment", humanoidRootPart)
+    local attachmentB = Instance.new("Attachment", workspace.CurrentCamera)
 
-    bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Velocity = Vector3.new(0,0,0)
-    bodyVelocity.MaxForce = Vector3.new(9e5, 9e5, 9e5)
-    bodyVelocity.Parent = rootPart
+    alignPos.Attachment0 = attachmentA
+    alignPos.Attachment1 = attachmentB
+    alignPos.RigidityEnabled = false
+    alignPos.MaxForce = 999999
+    alignPos.Responsiveness = 25
 
-    -- Control flying movement
-    local userInputService = game:GetService("UserInputService")
+    alignOri.Attachment0 = attachmentA
+    alignOri.Attachment1 = attachmentB
+    alignOri.MaxTorque = 999999
+    alignOri.Responsiveness = 25
 
-    local function fly()
-        while flying do
-            game:GetService("RunService").Heartbeat:Wait()
-            local camCF = workspace.CurrentCamera.CFrame
-            local moveDirection = Vector3.new(0,0,0)
-            if userInputService:IsKeyDown(Enum.KeyCode.W) then
-                moveDirection = moveDirection + camCF.LookVector
-            end
-            if userInputService:IsKeyDown(Enum.KeyCode.S) then
-                moveDirection = moveDirection - camCF.LookVector
-            end
-            if userInputService:IsKeyDown(Enum.KeyCode.A) then
-                moveDirection = moveDirection - camCF.RightVector
-            end
-            if userInputService:IsKeyDown(Enum.KeyCode.D) then
-                moveDirection = moveDirection + camCF.RightVector
-            end
-            if userInputService:IsKeyDown(Enum.KeyCode.Space) then
-                moveDirection = moveDirection + Vector3.new(0,1,0)
-            end
-            if userInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-                moveDirection = moveDirection - Vector3.new(0,1,0)
-            end
+    flyConnection = runService.Heartbeat:Connect(function()
+        local camCF = workspace.CurrentCamera.CFrame
+        local moveDirection = Vector3.new()
 
-            if moveDirection.Magnitude > 0 then
-                moveDirection = moveDirection.Unit
-            end
-
-            bodyVelocity.Velocity = moveDirection * speed
-            bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+        if userInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + camCF.LookVector
         end
-    end
+        if userInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - camCF.LookVector
+        end
+        if userInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - camCF.RightVector
+        end
+        if userInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + camCF.RightVector
+        end
+        if userInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0,1,0)
+        end
+        if userInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDirection = moveDirection - Vector3.new(0,1,0)
+        end
 
-    spawn(fly)
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit * speed
+            attachmentB.WorldCFrame = CFrame.new(humanoidRootPart.Position + moveDirection)
+        else
+            attachmentB.WorldCFrame = CFrame.new(humanoidRootPart.Position)
+        end
+    end)
 end
 
 function stopFlying()
-    humanoid.PlatformStand = false
-    if bodyGyro then bodyGyro:Destroy() end
-    if bodyVelocity then bodyVelocity:Destroy() end
+    if flyConnection then flyConnection:Disconnect() end
+    for _,v in ipairs(humanoidRootPart:GetChildren()) do
+        if v:IsA("AlignPosition") or v:IsA("AlignOrientation") or v:IsA("Attachment") then
+            v:Destroy()
+        end
+    end
 end
