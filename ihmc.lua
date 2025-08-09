@@ -1,76 +1,87 @@
--- Auto Reel Script + Rayfield GUI
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
-local player = game.Players.LocalPlayer
-local rs = game:GetService("RunService")
-local tweenService = game:GetService("TweenService")
-local reelingGui = player.PlayerGui:WaitForChild("Reeling")
+local RodRemoteEvent = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("RodRemoteEvent")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
 
--- Ambil element GUI
-local outerFrame = reelingGui:WaitForChild("Frame")
-local innerFrame = outerFrame:WaitForChild("Frame")
-local whiteBar = innerFrame:WaitForChild("WhiteBar")
-local redBar = innerFrame:WaitForChild("RedBar")
-local progressBar = outerFrame:WaitForChild("ProgressBg"):WaitForChild("ProgressBar")
+-- GUI Setup (as you said, StarterGui->reeling->Frame)
+local PlayerGui = player:WaitForChild("PlayerGui")
+local ReelingGui = PlayerGui:WaitForChild("reeling")
+local Frame = ReelingGui:WaitForChild("Frame")
+local InnerFrame = Frame:WaitForChild("Frame")  -- The inner frame with bars
+local WhiteBar = InnerFrame:WaitForChild("WhiteBar")
+local RedBar = InnerFrame:WaitForChild("RedBar")
+local ProgressBar = Frame:WaitForChild("ProgressBg"):WaitForChild("ProgressBar")
 
-local fishing = false
-local connection
+-- Hide GUI initially
+ReelingGui.Enabled = false
 
--- Fungsi start auto reel
-local function startReeling()
-    if connection then connection:Disconnect() end
-    fishing = true
-    connection = rs.RenderStepped:Connect(function(dt)
-        local wPos = whiteBar.AbsolutePosition
-        local wSize = whiteBar.AbsoluteSize
-        local rPos = redBar.AbsolutePosition
-        local rSize = redBar.AbsoluteSize
+-- Constants for the minigame
+local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, false)
 
-        local overlap = (rPos.X < wPos.X + wSize.X) and (wPos.X < rPos.X + rSize.X) and
-                        (rPos.Y < wPos.Y + wSize.Y) and (wPos.Y < rPos.Y + rSize.Y)
-
-        if overlap then
-            progressBar.Size = UDim2.new(math.min(progressBar.Size.X.Scale + 0.08 * dt, 1), 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
-        else
-            progressBar.Size = UDim2.new(math.max(progressBar.Size.X.Scale - 0.09 * dt, 0), 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
-        end
-    end)
+-- Reset function for the reeling GUI & connections
+local function reset()
+    ReelingGui.Enabled = false
+    RedBar.Position = UDim2.new(0.489, 0, -0.089, 0)
+    WhiteBar.Size = UDim2.new(0.4, 0, 1, 0)
+    WhiteBar.Position = UDim2.new(0, 0, 0, 0)
+    ProgressBar.Size = UDim2.new(0.4, 0, 1, 0)
+    WhiteBar.BackgroundColor3 = Color3.fromRGB(170, 170, 170)
 end
 
--- Fungsi stop auto reel
-local function stopReeling()
-    fishing = false
-    if connection then
-        connection:Disconnect()
-        connection = nil
+-- Equip Basic Rod function
+local function equipRod()
+    local backpack = player:WaitForChild("Backpack")
+    local rod = backpack:FindFirstChild("Basic Rod")
+    if rod then
+        player.Character.Humanoid:EquipTool(rod)
+        return true
+    else
+        print("Rod belum ada di backpack")
+        return false
     end
 end
 
--- Buat GUI di Rayfield
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+-- Auto cast rod (lempar)
+local function castRod()
+    RodRemoteEvent:FireServer("Cast")
+end
 
-local Window = Rayfield:CreateWindow({
-    Name = "Auto Fishing",
-    LoadingTitle = "Fishing Script",
-    LoadingSubtitle = "by ChatGPT",
-    ConfigurationSaving = {
-       Enabled = true,
-       FolderName = "AutoFishing",
-       FileName = "config"
-    }
-})
+-- Minigame vars
+local reelingActive = false
+local whiteMovingRight = true
+local redTween = nil
+local connections = {}
 
-local Tab = Window:CreateTab("Main", 4483362458)
+local function startReeling(minigameArg)
+    ReelingGui.Enabled = true
+    ProgressBar.Size = UDim2.new(0.4, 0, 1, 0)
+    whiteMovingRight = true
+    reelingActive = true
 
-Tab:CreateButton({
-    Name = "Start Auto Reel",
-    Callback = function()
-        startReeling()
-    end,
-})
+    -- Tween RedBar randomly every 1-3 seconds
+    redTween = task.spawn(function()
+        while reelingActive do
+            local newPosX = math.random() * 0.8 + 0.1
+            TweenService:Create(RedBar, tweenInfo, {Position = UDim2.new(newPosX, 0, RedBar.Position.Y.Scale, 0)}):Play()
+            task.wait(math.random(1, 3))
+        end
+    end)
 
-Tab:CreateButton({
-    Name = "Stop Auto Reel",
-    Callback = function()
-        stopReeling()
-    end,
-})
+    -- Update loop to move whitebar and update progress
+    local conn = RunService.RenderStepped:Connect(function(dt)
+        if not reelingActive then return end
+
+        -- Move whitebar
+        local frameWidth = Frame.AbsoluteSize.X
+        local whiteAbsSize = WhiteBar.AbsoluteSize.X
+        local whitePosX = WhiteBar.Position.X.Scale
+
+        local speed = 0.7 * dt -- adjust speed
+
+        if whiteMovingRight then
+            whitePosX = math.min(whitePosX + speed, (frameWidth - whiteAbsSize)
