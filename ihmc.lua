@@ -4,11 +4,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RodRemoteEvent = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("RodRemoteEvent")
 local RunService = game:GetService("RunService")
 
-local autoMancing = true
+local autoMancing = false
 local reelingActive = false
 local autoReelConnection
+local autoMancingThread
 
--- Equip Basic Rod
 local function equipRod()
     local rod = player.Backpack:FindFirstChild("Basic Rod") or player.Character:FindFirstChild("Basic Rod")
     if rod then
@@ -19,7 +19,6 @@ local function equipRod()
     end
 end
 
--- Lempar joran
 local function castRod()
     local mousePos = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y/2)
     VirtualUser:Button1Down(mousePos)
@@ -28,7 +27,6 @@ local function castRod()
     print("[AutoMancing] Rod casted!")
 end
 
--- Auto reel
 local function autoReel(arg2)
     local gui = player.PlayerGui:FindFirstChild("FishingUI")
     if not gui then return end
@@ -38,6 +36,11 @@ local function autoReel(arg2)
 
     local direction = 1
     reelingActive = true
+
+    if autoReelConnection then
+        autoReelConnection:Disconnect()
+        autoReelConnection = nil
+    end
 
     autoReelConnection = RunService.RenderStepped:Connect(function(dt)
         if not reelingActive then return end
@@ -55,18 +58,59 @@ local function autoReel(arg2)
         if progressBar.Size.X.Scale >= 1 then
             reelingActive = false
             RodRemoteEvent:FireServer("Reeling", arg2, true)
-            if autoReelConnection then autoReelConnection:Disconnect() end
+            if autoReelConnection then
+                autoReelConnection:Disconnect()
+                autoReelConnection = nil
+            end
             print("[AutoMancing] Fish caught!")
         elseif progressBar.Size.X.Scale <= 0 then
             reelingActive = false
             RodRemoteEvent:FireServer("Reeling", arg2, false)
-            if autoReelConnection then autoReelConnection:Disconnect() end
+            if autoReelConnection then
+                autoReelConnection:Disconnect()
+                autoReelConnection = nil
+            end
             print("[AutoMancing] Fish escaped!")
         end
     end)
 end
 
--- Dengarkan event dari server
+local function startAutoMancing()
+    if autoMancing then
+        print("[AutoMancing] Sudah berjalan!")
+        return
+    end
+    autoMancing = true
+    autoMancingThread = task.spawn(function()
+        while autoMancing do
+            if not reelingActive then
+                equipRod()
+                task.wait(0.3)
+                castRod()
+            else
+                task.wait(0.1)
+            end
+            task.wait(0.2)
+        end
+    end)
+    print("[AutoMancing] Dimulai!")
+end
+
+local function stopAutoMancing()
+    autoMancing = false
+    reelingActive = false
+    if autoReelConnection then
+        autoReelConnection:Disconnect()
+        autoReelConnection = nil
+    end
+    if autoMancingThread then
+        -- Tidak perlu explicit cancel task.spawn tapi biar jelas
+        autoMancingThread = nil
+    end
+    print("[AutoMancing] Dihentikan!")
+end
+
+-- Event handler untuk mulai auto reeling
 RodRemoteEvent.OnClientEvent:Connect(function(action, arg2)
     if action == "Reeling" then
         print("[AutoMancing] Reeling started!")
@@ -74,14 +118,10 @@ RodRemoteEvent.OnClientEvent:Connect(function(action, arg2)
     end
 end)
 
--- Loop utama
-task.spawn(function()
-    while autoMancing do
-        if not reelingActive then
-            equipRod()
-            task.wait(0.3)
-            castRod()
-        end
-        task.wait(0.5)
-    end
-end)
+-- Kamu bisa panggil startAutoMancing() untuk mulai
+-- dan stopAutoMancing() untuk berhenti
+
+-- Contoh:
+-- startAutoMancing()
+-- task.wait(10)
+-- stopAutoMancing()
