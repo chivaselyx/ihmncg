@@ -1,87 +1,76 @@
--- GUI Auto Mancing
-local ScreenGui = Instance.new("ScreenGui")
-local Frame = Instance.new("Frame")
-local ToggleButton = Instance.new("TextButton")
-local CloseButton = Instance.new("TextButton")
+-- Auto Reel Script + Rayfield GUI
 
-ScreenGui.Parent = game.CoreGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local player = game.Players.LocalPlayer
+local rs = game:GetService("RunService")
+local tweenService = game:GetService("TweenService")
+local reelingGui = player.PlayerGui:WaitForChild("Reeling")
 
-Frame.Parent = ScreenGui
-Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Frame.Size = UDim2.new(0, 200, 0, 100)
-Frame.Position = UDim2.new(0.5, -100, 0.5, -50)
+-- Ambil element GUI
+local outerFrame = reelingGui:WaitForChild("Frame")
+local innerFrame = outerFrame:WaitForChild("Frame")
+local whiteBar = innerFrame:WaitForChild("WhiteBar")
+local redBar = innerFrame:WaitForChild("RedBar")
+local progressBar = outerFrame:WaitForChild("ProgressBg"):WaitForChild("ProgressBar")
 
--- Tombol Auto Mancing
-ToggleButton.Parent = Frame
-ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-ToggleButton.Size = UDim2.new(1, -10, 0, 40)
-ToggleButton.Position = UDim2.new(0, 5, 0, 30)
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "Auto Mancing: OFF"
+local fishing = false
+local connection
 
--- Tombol Close
-CloseButton.Parent = Frame
-CloseButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-CloseButton.Size = UDim2.new(0, 25, 0, 25)
-CloseButton.Position = UDim2.new(1, -30, 0, 5)
-CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseButton.Text = "X"
+-- Fungsi start auto reel
+local function startReeling()
+    if connection then connection:Disconnect() end
+    fishing = true
+    connection = rs.RenderStepped:Connect(function(dt)
+        local wPos = whiteBar.AbsolutePosition
+        local wSize = whiteBar.AbsoluteSize
+        local rPos = redBar.AbsolutePosition
+        local rSize = redBar.AbsoluteSize
 
--- Variabel Global
-getgenv().AutoMancing = false
-local rodName = "Basic Rod" -- ganti kalau pakai rod lain
+        local overlap = (rPos.X < wPos.X + wSize.X) and (wPos.X < rPos.X + rSize.X) and
+                        (rPos.Y < wPos.Y + wSize.Y) and (wPos.Y < rPos.Y + rSize.Y)
 
--- Fungsi lempar joran
-local function throwRod()
-    local player = game.Players.LocalPlayer
-    local char = player.Character or player.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-
-    -- Equip rod
-    if humanoid and player.Backpack:FindFirstChild(rodName) then
-        humanoid:EquipTool(player.Backpack[rodName])
-    end
-
-    -- Klik lempar (trigger remote)
-    local rod = char:FindFirstChild(rodName)
-    if rod and rod:FindFirstChild("Remote") then
-        rod.Remote:FireServer("Cast", math.random(1, 100))
-    end
-end
-
--- Fungsi reeling otomatis
-local function reelFish()
-    local rod = game.Players.LocalPlayer.Character:FindFirstChild(rodName)
-    if rod and rod:FindFirstChild("Remote") then
-        rod.Remote:FireServer("Reeling", math.random(1, 100), true)
-    end
-end
-
--- Main Loop Auto Mancing
-local function autoFishingLoop()
-    spawn(function()
-        while getgenv().AutoMancing do
-            throwRod()
-            task.wait(math.random(2, 4)) -- tunggu ikan nyangkut
-            reelFish()
-            task.wait(1) -- jeda sebelum ulang
+        if overlap then
+            progressBar.Size = UDim2.new(math.min(progressBar.Size.X.Scale + 0.08 * dt, 1), 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
+        else
+            progressBar.Size = UDim2.new(math.max(progressBar.Size.X.Scale - 0.09 * dt, 0), 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
         end
     end)
 end
 
--- Klik tombol toggle
-ToggleButton.MouseButton1Click:Connect(function()
-    getgenv().AutoMancing = not getgenv().AutoMancing
-    ToggleButton.Text = "Auto Mancing: " .. (getgenv().AutoMancing and "ON" or "OFF")
-
-    if getgenv().AutoMancing then
-        autoFishingLoop()
+-- Fungsi stop auto reel
+local function stopReeling()
+    fishing = false
+    if connection then
+        connection:Disconnect()
+        connection = nil
     end
-end)
+end
 
--- Klik tombol close
-CloseButton.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-    getgenv().AutoMancing = false
-end)
+-- Buat GUI di Rayfield
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Auto Fishing",
+    LoadingTitle = "Fishing Script",
+    LoadingSubtitle = "by ChatGPT",
+    ConfigurationSaving = {
+       Enabled = true,
+       FolderName = "AutoFishing",
+       FileName = "config"
+    }
+})
+
+local Tab = Window:CreateTab("Main", 4483362458)
+
+Tab:CreateButton({
+    Name = "Start Auto Reel",
+    Callback = function()
+        startReeling()
+    end,
+})
+
+Tab:CreateButton({
+    Name = "Stop Auto Reel",
+    Callback = function()
+        stopReeling()
+    end,
+})
